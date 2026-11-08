@@ -220,10 +220,15 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-  function toISO(timestampMs) {
+  function toLocaleString(timestampMs) {
     if (!timestampMs) return '';
     const date = new Date(Number(timestampMs));
-    return isNaN(date.getTime()) ? '' : date.toISOString();
+    return isNaN(date.getTime()) ? '' : date.toLocaleString();
+  }
+
+  function msToMinutes(durationMs) {
+    if (!durationMs) return 0;
+    return Math.round(Number(durationMs) / 60000);
   }
 
   function parseDate(dateStr) {
@@ -276,12 +281,12 @@
           const isEbike = text.toLowerCase().includes('ebike') || text.toLowerCase().includes('e-bike');
 
           rides.push({
-            rideId: `scraped-${index}-${Date.now()}`,
-            startTime: toISO(startMs),
-            endTime: toISO(endMs),
-            rawStartMs: startMs, // retained temporarily for filtering
+            rideId: `scraped-${startMs}-${index}`,
+            startTime: toLocaleString(startMs),
+            endTime: toLocaleString(endMs),
+            rawStartMs: startMs,
             price: priceMatch ? priceMatch[0] : '$0.00',
-            duration: durationMs,
+            duration: msToMinutes(durationMs),
             startAddress: `Station ${index + 1}`,
             endAddress: `Station ${index + 1}B`,
             rideableName: isEbike ? 'ebike' : 'classic',
@@ -437,9 +442,9 @@
 
         enriched.push({
           rideId: ride.rideId,
-          startTime: toISO(ride.startTimeMs),
-          endTime: toISO(ride.endTimeMs),
-          duration: ride.duration,
+          startTime: toLocaleString(ride.startTimeMs),
+          endTime: toLocaleString(ride.endTimeMs),
+          duration: msToMinutes(ride.duration),
           price: ride.price?.formatted || '$0.00',
           rideableName: ride.rideableName || 'classic',
           startAddress: details.startAddressStr || 'Unknown Station',
@@ -448,9 +453,9 @@
       } catch (e) {
         enriched.push({
           rideId: ride.rideId,
-          startTime: toISO(ride.startTimeMs),
-          endTime: toISO(ride.endTimeMs),
-          duration: ride.duration,
+          startTime: toLocaleString(ride.startTimeMs),
+          endTime: toLocaleString(ride.endTimeMs),
+          duration: msToMinutes(ride.duration),
           price: ride.price?.formatted || '$0.00',
           rideableName: ride.rideableName || 'classic',
           startAddress: 'Unknown Station',
@@ -472,7 +477,7 @@
     for (let i = 0; i < maxScrolls && !cancelled; i++) {
       const currentRides = scrapeVisibleRides();
       const newRides = currentRides.filter(r =>
-        !allScrapedRides.some(existing => existing.startTime === r.startTime)
+        !allScrapedRides.some(existing => existing.rideId === r.rideId)
       );
 
       allScrapedRides.push(...newRides);
@@ -503,6 +508,18 @@
     return allScrapedRides.filter(r => {
       const ts = r.rawStartMs;
       return ts >= START_DATE && ts <= END_DATE;
+    });
+  }
+
+  // Deduplicate array of ride objects based on rideId
+  function deduplicateRides(rides) {
+    const seen = new Set();
+    return rides.filter(ride => {
+      if (!ride.rideId || seen.has(ride.rideId)) {
+        return false;
+      }
+      seen.add(ride.rideId);
+      return true;
     });
   }
 
@@ -553,6 +570,9 @@
 
       if (cancelled) return;
 
+      // Remove duplicate ride entries by unique rideId
+      allRides = deduplicateRides(allRides);
+
       if (allRides.length === 0) {
         subtitle.textContent = 'No rides found in the last 365 days';
         progressText.textContent = '0';
@@ -563,7 +583,7 @@
 
       progressBar.style.width = '100%';
       progressText.textContent = allRides.length;
-      progressLabel.textContent = 'rides ready!';
+      progressLabel.textContent = 'unique rides ready!';
       subtitle.textContent = 'All done!';
       timeRemaining.textContent = '';
       downloadBtn.disabled = false;
@@ -576,6 +596,7 @@
     } catch (error) {
       console.error('Citi Bike Exporter Error:', error);
       if (allRides.length > 0) {
+        allRides = deduplicateRides(allRides);
         progressBar.style.width = '100%';
         progressText.textContent = allRides.length;
         progressLabel.textContent = 'rides (with errors)';
