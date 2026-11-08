@@ -220,6 +220,12 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  function toISO(timestampMs) {
+    if (!timestampMs) return '';
+    const date = new Date(Number(timestampMs));
+    return isNaN(date.getTime()) ? '' : date.toISOString();
+  }
+
   function parseDate(dateStr) {
     try {
       const parsed = new Date(dateStr);
@@ -271,8 +277,9 @@
 
           rides.push({
             rideId: `scraped-${index}-${Date.now()}`,
-            startTimeMs: String(startMs),
-            endTimeMs: String(endMs),
+            startTime: toISO(startMs),
+            endTime: toISO(endMs),
+            rawStartMs: startMs, // retained temporarily for filtering
             price: priceMatch ? priceMatch[0] : '$0.00',
             duration: durationMs,
             startAddress: `Station ${index + 1}`,
@@ -430,8 +437,8 @@
 
         enriched.push({
           rideId: ride.rideId,
-          startTimeMs: ride.startTimeMs,
-          endTimeMs: ride.endTimeMs,
+          startTime: toISO(ride.startTimeMs),
+          endTime: toISO(ride.endTimeMs),
           duration: ride.duration,
           price: ride.price?.formatted || '$0.00',
           rideableName: ride.rideableName || 'classic',
@@ -441,8 +448,8 @@
       } catch (e) {
         enriched.push({
           rideId: ride.rideId,
-          startTimeMs: ride.startTimeMs,
-          endTimeMs: ride.endTimeMs,
+          startTime: toISO(ride.startTimeMs),
+          endTime: toISO(ride.endTimeMs),
           duration: ride.duration,
           price: ride.price?.formatted || '$0.00',
           rideableName: ride.rideableName || 'classic',
@@ -465,7 +472,7 @@
     for (let i = 0; i < maxScrolls && !cancelled; i++) {
       const currentRides = scrapeVisibleRides();
       const newRides = currentRides.filter(r =>
-        !allScrapedRides.some(existing => existing.startTimeMs === r.startTimeMs)
+        !allScrapedRides.some(existing => existing.startTime === r.startTime)
       );
 
       allScrapedRides.push(...newRides);
@@ -482,7 +489,7 @@
 
       if (allScrapedRides.length > 0) {
         const oldestRide = allScrapedRides.reduce((oldest, r) => {
-          const ts = parseInt(r.startTimeMs);
+          const ts = r.rawStartMs;
           return ts < oldest ? ts : oldest;
         }, Date.now());
 
@@ -494,14 +501,14 @@
     }
 
     return allScrapedRides.filter(r => {
-      const ts = parseInt(r.startTimeMs);
+      const ts = r.rawStartMs;
       return ts >= START_DATE && ts <= END_DATE;
     });
   }
 
   // Convert array of ride objects into CSV string
   function convertToCSV(rides) {
-    const headers = ["rideId", "startTimeMs", "endTimeMs", "duration", "price", "rideableName", "startAddress", "endAddress"];
+    const headers = ["rideId", "startTime", "endTime", "duration", "price", "rideableName", "startAddress", "endAddress"];
     
     const escapeCSV = (val) => {
       if (val === null || val === undefined) return '""';
@@ -560,28 +567,4 @@
       subtitle.textContent = 'All done!';
       timeRemaining.textContent = '';
       downloadBtn.disabled = false;
-      modal.classList.add('done');
-
-      downloadBtn.onclick = () => {
-        triggerCSVDownload(allRides);
-      };
-
-    } catch (error) {
-      console.error('Citi Bike Exporter Error:', error);
-      if (allRides.length > 0) {
-        progressBar.style.width = '100%';
-        progressText.textContent = allRides.length;
-        progressLabel.textContent = 'rides (with errors)';
-        subtitle.textContent = 'Partial data loaded';
-        downloadBtn.disabled = false;
-        downloadBtn.onclick = () => triggerCSVDownload(allRides);
-      } else {
-        subtitle.textContent = 'Error: ' + error.message;
-        subtitle.style.color = '#f87171';
-        progressBar.style.background = '#f87171';
-      }
-    }
-  }
-
-  main();
-})();
+      modal.classList.add
