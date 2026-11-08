@@ -525,7 +525,7 @@
 
   // Convert array of ride objects into CSV string
   function convertToCSV(rides) {
-    const headers = ["rideId", "startTime", "endTime", "duration", "price", "rideableName", "startAddress", "endAddress"];
+    const headers = ["Ride ID", "Start Time", "End Time", "Duration (Minutes)", "Price", "Bike ID", "Start Address", "End Address"];
     
     const escapeCSV = (val) => {
       if (val === null || val === undefined) return '""';
