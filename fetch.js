@@ -567,4 +567,28 @@
       subtitle.textContent = 'All done!';
       timeRemaining.textContent = '';
       downloadBtn.disabled = false;
-      modal.classList.add
+      modal.classList.add('done');
+
+      downloadBtn.onclick = () => {
+        triggerCSVDownload(allRides);
+      };
+
+    } catch (error) {
+      console.error('Citi Bike Exporter Error:', error);
+      if (allRides.length > 0) {
+        progressBar.style.width = '100%';
+        progressText.textContent = allRides.length;
+        progressLabel.textContent = 'rides (with errors)';
+        subtitle.textContent = 'Partial data loaded';
+        downloadBtn.disabled = false;
+        downloadBtn.onclick = () => triggerCSVDownload(allRides);
+      } else {
+        subtitle.textContent = 'Error: ' + error.message;
+        subtitle.style.color = '#f87171';
+        progressBar.style.background = '#f87171';
+      }
+    }
+  }
+
+  main();
+})();
